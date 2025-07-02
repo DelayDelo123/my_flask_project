@@ -66,7 +66,7 @@
               - python3-pip
             state: present # Убедиться, что они установлены
 
-        - name: Установить зависимости Python из requirements.txt
+        - name: Установить зависимости Python через pip
           ansible.builtin.pip:
             requirements: "{{ project_root_path }}/requirements.txt" # Путь к файлу зависимостей на Slave
             executable: pip3 # Используем pip3
@@ -114,19 +114,19 @@
           ansible.builtin.systemd:
             name: nginx
             state: started # Запустить службу
-            enabled: yes # Включить в автозапуск при загрузке системы
+            enabled: yes
 
-        - name: Проверить, что сайт запущен и доступен через Nginx
+        - name: Проверить, что сайт запущен (через Nginx)
           ansible.builtin.uri:
-            url: "http://localhost:{{ nginx_listen_port }}" # URL для проверки (Nginx слушает на этом порту)
-            status_code: 200 # Ожидаемый HTTP-статус (200 OK)
-            validate_certs: no # Не проверять сертификаты (если используете HTTPS, измените)
-          register: website_check # Сохраняем результат
-          retries: 10 # Повторить попытку 10 раз
-          delay: 5 # С задержкой в 5 секунд между попытками (даем время приложению запуститься)
-          until: website_check.status == 200 # Продолжать, пока статус не станет 200
+            url: "http://localhost:{{ nginx_listen_port }}"
+            status_code: 200
+            validate_certs: no
+          register: website_check
+          retries: 10
+          delay: 5
+          until: website_check.status == 200
 
-        - name: Отобразить результат финальной проверки
+        - name: Отобразить результат проверки
           ansible.builtin.debug:
             msg: "🥳 Сайт успешно запущен и доступен по адресу http://{{ ansible_host }}:{{ nginx_listen_port }}/"
           when: website_check.status == 200
@@ -139,8 +139,7 @@
 
     - name: Reload systemd and Start Flask App
       ansible.builtin.systemd:
-        daemon_reload: yes # Перезагрузить конфигурацию systemd
-      - ansible.builtin.systemd:
-          name: flask_app # Название нашей службы
-          state: started # Запустить службу
-          enabled: yes # Включить в автозапуск
+        daemon_reload: yes # Сначала перезагружаем конфигурацию systemd
+        name: flask_app # Затем управляем нашей службой
+        state: started # Запустить службу
+        enabled: yes # Включить в автозапуск
