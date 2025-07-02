@@ -39,7 +39,7 @@
       ansible.builtin.git:
         repo: 'https://github.com/DelayDelo123/my_flask_project.git' # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
         dest: '/home/user/my_flask_project'
-        version: main
+        version: master
         force: yes
       become_user: user
 
