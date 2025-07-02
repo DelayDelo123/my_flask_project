@@ -2,9 +2,15 @@
 - name: Развертывание Простого Flask-сайта
   hosts: web_servers
   become: yes
-  gather_facts: false # <-- ДОБАВЬТЕ ЭТУ СТРОКУ
+  gather_facts: false # Эта строка уже должна быть
   tasks:
-    - name: Обновить системные пакеты
+    - name: Убедиться, что python3-apt установлен для модулей Ansible (используя raw)
+      raw: sudo apt update && sudo apt install -y python3-apt python3-pip
+      args:
+        warn: no # Отключаем предупреждение о raw модуле
+      changed_when: false # Не считаем это изменением состояния
+
+    - name: Обновить системные пакеты # <-- ЭТО ВАША СУЩЕСТВУЮЩАЯ ЗАДАЧА
       ansible.builtin.apt:
         update_cache: yes
         upgrade: dist
