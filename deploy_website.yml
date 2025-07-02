@@ -2,10 +2,10 @@
 - name: Развертывание Простого Flask-сайта
   hosts: web_servers
   become: yes
-  gather_facts: false
+  gather_facts: false # Оставляем отключенным, так как это вызывало проблемы
 
   tasks:
-    # Эти задачи оставляем без изменений, они работают
+    # --- ЗАДАЧИ, КОТОРЫЕ МЫ ОТЛАЖИВАЛИ (ОСТАВЛЯЕМ) ---
     - name: Убедиться, что python3-apt установлен для модулей Ansible (используя raw)
       raw: sudo apt update && sudo apt install -y python3-apt python3-pip
       args:
@@ -21,32 +21,27 @@
         warn: no
       changed_when: true
 
-    # ЭТУ ЗАДАЧУ МЕНЯЕМ НА SHELL:
     - name: Установка зависимостей Python и других пакетов (используя shell)
       ansible.builtin.shell: |
         sudo apt install -y git nginx uwsgi uwsgi-plugin-python3 python3-venv
       args:
         warn: no
-      changed_when: true # Считаем, что это всегда может привести к изменению
+      changed_when: true
 
-    # --- Остальные задачи плейбука (клонирование Git, создание venv, pip install) ---
-    # ОСТАВЬТЕ ВСЕ ОСТАЛЬНЫЕ ЗАДАЧИ НИЖЕ БЕЗ ИЗМЕНЕНИЙ,
-    # так как они используют модули (git, pip, template, file, systemd),
-    # которые обычно не имеют проблем с этой ошибкой _cffi_backend_
-    # (или мы с ними еще не столкнулись)
+    # --- НОВЫЕ/ВОССТАНОВЛЕННЫЕ ЗАДАЧИ ДЛЯ РАЗВЕРТЫВАНИЯ FLASK ---
 
     - name: Клонирование или обновление репозитория Flask-приложения
       ansible.builtin.git:
-        repo: 'https://github.com/DelayDelo123/my_flask_project.git' # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
-        dest: '/home/user/my_flask_project'
-        version: master
+        repo: 'https://github.com/DelayDelo123/my_flask_project' # <--- НЕ ЗАБУДЬТЕ ЗАМЕНИТЬ НА СВОЙ РЕПОЗИТОРИЙ!
+        dest: '/home/user/my_flask_project' # <--- ПУТЬ К ПРОЕКТУ НА SLAVE-ВМ
+        version: main # ИЛИ master, если ваша основная ветка так называется на GitHub
         force: yes
       become_user: user
 
     - name: Создание виртуального окружения Python
       ansible.builtin.shell: "python3 -m venv /home/user/my_flask_project/venv"
       args:
-        creates: /home/user/my_flask_project/venv/bin/pip
+        creates: /home/user/my_flask_project/venv/bin/pip # Убедимся, что не создаем заново
       become_user: user
 
     - name: Установка зависимостей Flask из requirements.txt
@@ -55,9 +50,17 @@
         virtualenv: "/home/user/my_flask_project/venv"
       become_user: user
 
+    # --- НОВАЯ ЗАДАЧА ДЛЯ КОПИРОВАНИЯ UWSGI.INI ---
+    - name: Копирование файла конфигурации UWSGI
+      ansible.builtin.template:
+        src: uwsgi.ini # Имя файла uwsgi.ini в вашем репозитории Ansible
+        dest: "{{ project_root_path }}/uwsgi.ini" # Путь назначения на Slave-ВМ
+        mode: '0644'
+      notify: Перезапустить UWSGI сервис # Запустит хэндлер после успешного копирования
+
     - name: Копирование файла конфигурации Nginx
       ansible.builtin.template:
-        src: nginx_site.conf.j2
+        src: nginx_site.conf.j2 # Имя файла шаблона Nginx в вашем проекте
         dest: /etc/nginx/sites-available/flask_app
         mode: '0644'
       notify: Перезагрузить Nginx
@@ -77,7 +80,7 @@
 
     - name: Копирование файла systemd-сервиса UWSGI
       ansible.builtin.template:
-        src: flask_app.service.j2
+        src: flask_app.service.j2 # Имя файла шаблона сервиса UWSGI в вашем проекте
         dest: /etc/systemd/system/flask_app.service
         mode: '0644'
       notify: Перезапустить UWSGI сервис
@@ -87,7 +90,7 @@
         name: flask_app
         state: started
         enabled: yes
-        daemon_reload: yes
+        daemon_reload: yes # Важно после добавления нового сервиса
 
   handlers:
     - name: Перезагрузить Nginx
@@ -99,4 +102,4 @@
       ansible.builtin.systemd:
         name: flask_app
         state: restarted
-        daemon_reload: yes
+        daemon_reload: yes # Важно, если были изменения в файле сервиса
