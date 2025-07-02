@@ -34,7 +34,7 @@
       ansible.builtin.git:
         repo: 'https://github.com/DelayDelo123/my_flask_project' # <--- НЕ ЗАБУДЬТЕ ЗАМЕНИТЬ НА СВОЙ РЕПОЗИТОРИЙ!
         dest: '/home/user/my_flask_project' # <--- ПУТЬ К ПРОЕКТУ НА SLAVE-ВМ
-        version: main # ИЛИ master, если ваша основная ветка так называется на GitHub
+        version: master # ИЛИ master, если ваша основная ветка так называется на GitHub
         force: yes
       become_user: user
 
