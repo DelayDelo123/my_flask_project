@@ -2,16 +2,27 @@
 - name: Развертывание Простого Flask-сайта
   hosts: web_servers
   become: yes
-  gather_facts: false # Эта строка уже должна быть
+  gather_facts: false # Эта строка должна быть
   tasks:
+    # Эту задачу оставляем без изменений, она работает
     - name: Убедиться, что python3-apt установлен для модулей Ansible (используя raw)
       raw: sudo apt update && sudo apt install -y python3-apt python3-pip
       args:
-        warn: no # Отключаем предупреждение о raw модуле
-      changed_when: false # Не считаем это изменением состояния
+        warn: no
+      changed_when: false
 
-    - name: Обновить системные пакеты # <-- ЭТО ВАША СУЩЕСТВУЮЩАЯ ЗАДАЧА
-      ansible.builtin.apt:
-        update_cache: yes
-        upgrade: dist
-        # ... остальные задачи вашего плейбука ...
+    # ЭТУ ЗАДАЧУ МЕНЯЕМ:
+    - name: Обновить системные пакеты (используя shell для обхода проблемы с apt)
+      ansible.builtin.shell: |
+        sudo apt update
+        sudo apt upgrade -y
+        sudo apt autoremove -y # Добавим очистку, если что-то осталось
+      args:
+        warn: no # Отключает предупреждение о shell-модуле
+      changed_when: true # Это говорит Ansible, что задача всегда может изменить состояние
+      # Можно также добавить:
+      # register: apt_upgrade_output
+      # failed_when: "'Failed' in apt_upgrade_output.stderr" # Пример проверки на ошибки, если нужно
+
+    # ... остальные задачи вашего плейбука идут ЗДЕСЬ, без изменений ...
+    # (Например, установка Flask, настройка Nginx и т.д.)
