@@ -3,7 +3,7 @@ Description=uWSGI instance to serve my_flask_project
 After=network.target
 
 [Service]
-User={{ ansible_user }} # Или 'user', если вы явно указали его
+User=www-data
 Group=www-data
 WorkingDirectory={{ project_root_path }}
 Environment="PATH={{ project_root_path }}/venv/bin"

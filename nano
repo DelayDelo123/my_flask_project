@@ -2,9 +2,10 @@
 - name: Развертывание Простого Flask-сайта
   hosts: web_servers
   become: yes
-  gather_facts: false
+  gather_facts: false # Оставляем отключенным, так как это вызывало проблемы
 
   tasks:
+    # --- ЗАДАЧИ, КОТОРЫЕ МЫ ОТЛАЖИВАЛИ (ОСТАВЛЯЕМ) ---
     - name: Убедиться, что python3-apt установлен для модулей Ansible (используя raw)
       raw: sudo apt update && sudo apt install -y python3-apt python3-pip
       args:
@@ -20,53 +21,42 @@
         warn: no
       changed_when: true
 
-    - name: Установка зависимостей Python и других пакетов (используя shell)
-      ansible.builtin.shell: |
-        sudo apt install -y git nginx uwsgi uwsgi-plugin-python3 python3-venv
-      args:
-        warn: no
-      changed_when: true
+    # --- НОВЫЕ/ВОССТАНОВЛЕННЫЕ ЗАДАЧИ ДЛЯ РАЗВЕРТЫВАНИЯ FLASK ---
+
+    - name: Установка зависимостей Python и других пакетов
+      ansible.builtin.apt:
+        name:
+          - git # Для клонирования репозитория
+          - nginx # Веб-сервер
+          - uwsgi # WSGI сервер
+          - uwsgi-plugin-python3 # Плагин UWSGI для Python 3
+          - python3-venv # Для создания виртуального окружения
+        state: present
+        update_cache: yes # Убедимся, что кэш обновлен
 
     - name: Клонирование или обновление репозитория Flask-приложения
       ansible.builtin.git:
-        repo: 'https://github.com/DelayDelo123/my_flask_project' # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
-        dest: '/home/user/my_flask_project'
-        version: master # ИЛИ main, как у вас на GitHub
-        force: yes
-      become_user: user # Клонируем как 'user'
-
-    - name: Изменить владельца директории проекта на www-data (рекурсивно)
-      ansible.builtin.file:
-        path: /home/user/my_flask_project
-        owner: www-data
-        group: www-data
-        recurse: yes
-        state: directory
-      # Эта задача выполняется как root (become: yes для плейбука)
+        repo: 'https://https://github.com/DelayDelo123/my_flask_project' # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
+        dest: '/home/user/my_flask_project' # <--- ПУТЬ К ПРОЕКТУ НА SLAVE-ВМ
+        version: main # Или другая ветка, если нужно
+        force: yes # Для обновления, если уже существует
+      become_user: user # Выполнить от имени пользователя на Slave-ВМ (например, 'user')
 
     - name: Создание виртуального окружения Python
       ansible.builtin.shell: "python3 -m venv /home/user/my_flask_project/venv"
       args:
-        creates: /home/user/my_flask_project/venv/bin/pip
-      become_user: www-data # <--- ВАЖНО: теперь создаем venv от www-data
+        creates: /home/user/my_flask_project/venv/bin/pip # Убедимся, что не создаем заново
+      become_user: user
 
     - name: Установка зависимостей Flask из requirements.txt
       ansible.builtin.pip:
         requirements: "/home/user/my_flask_project/requirements.txt"
         virtualenv: "/home/user/my_flask_project/venv"
-      become_user: www-data # <--- ВАЖНО: теперь устанавливаем зависимости от www-data
-
-    - name: Копирование файла конфигурации UWSGI
-      ansible.builtin.template:
-        src: uwsgi.ini
-        dest: "{{ project_root_path }}/uwsgi.ini"
-        mode: '0644'
-      become_user: www-data # <--- Копируем от www-data
-      notify: Перезапустить UWSGI сервис
+      become_user: user
 
     - name: Копирование файла конфигурации Nginx
       ansible.builtin.template:
-        src: nginx_site.conf.j2
+        src: nginx_site.conf.j2 # Имя файла шаблона Nginx в вашем проекте
         dest: /etc/nginx/sites-available/flask_app
         mode: '0644'
       notify: Перезагрузить Nginx
@@ -86,7 +76,7 @@
 
     - name: Копирование файла systemd-сервиса UWSGI
       ansible.builtin.template:
-        src: flask_app.service.j2
+        src: flask_app.service.j2 # Имя файла шаблона сервиса UWSGI в вашем проекте
         dest: /etc/systemd/system/flask_app.service
         mode: '0644'
       notify: Перезапустить UWSGI сервис
@@ -96,7 +86,7 @@
         name: flask_app
         state: started
         enabled: yes
-        daemon_reload: yes
+        daemon_reload: yes # Важно после добавления нового сервиса
 
   handlers:
     - name: Перезагрузить Nginx
@@ -108,4 +98,4 @@
       ansible.builtin.systemd:
         name: flask_app
         state: restarted
-        daemon_reload: yes
+        daemon_reload: yes # Важно, если были изменения в файле сервиса
