@@ -1,0 +1,16 @@
+# flask_app.service.j2
+[Unit]
+Description=My Simple Flask Application
+After=network.target # Запускать после сетевых служб
+
+[Service]
+User=root # Пользователь, от имени которого запускать приложение (можно создать отдельного, но для "чайников" root проще)
+WorkingDirectory={{ project_root_path }} # Директория, где лежит наш сайт
+ExecStart=/usr/bin/python3 {{ project_root_path }}/app.py # Команда для запуска приложения
+Restart=always # Всегда перезапускать, если приложение упало
+StandardOutput=syslog # Логи отправлять в syslog
+StandardError=syslog # Ошибки отправлять в syslog
+SyslogIdentifier=flask-app # Идентификатор для логов
+
+[Install]
+WantedBy=multi-user.target # Запускать при загрузке системы в многопользовательском режиме
