@@ -7,7 +7,7 @@ User={{ ansible_user }} # Или 'user', если вы явно указали �
 Group=www-data
 WorkingDirectory={{ project_root_path }}
 Environment="PATH={{ project_root_path }}/venv/bin"
-ExecStart={{ project_root_path }}/venv/bin/uwsgi --ini {{ project_root_path }}/uwsgi.ini # Предполагается, что у вас есть uwsgi.ini
+ExecStart={{ project_root_path }}/venv/bin/uwsgi --ini {{ project_root_path }}/uwsgi.ini
 Restart=always
 KillSignal=SIGQUIT
 Type=notify
