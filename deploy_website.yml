@@ -33,26 +33,33 @@
         warn: no
       changed_when: true
 
-    # --- НОВАЯ ЗАДАЧА ДЛЯ SAFE.DIRECTORY ---
     - name: Добавление директории проекта в safe.directory Git для пользователя 'user'
       raw: sudo -H -u user git config --global --add safe.directory {{ project_root_path }}
       args:
         warn: no
       changed_when: true
-      # Это позволяет пользователю 'user' работать с репозиторием, владельцем которого является 'www-data'
+
+    # --- НОВАЯ ЗАДАЧА ДЛЯ ПРАВ .GIT ---
+    - name: Изменение владельца директории .git на 'user' перед Git-операциями
+      ansible.builtin.file:
+        path: "{{ project_root_path }}/.git"
+        owner: user
+        group: user
+        recurse: yes
+        state: directory
+      when: "'/home/user/my_flask_project/.git' is exists" # Выполнять только если .git уже существует (для pull)
+      # Эта задача должна быть выполнена перед клонированием/обновлением, чтобы у пользователя 'user' были права
 
     - name: Клонирование или обновление репозитория Flask-приложения (используя raw)
       raw: |
-        if [ ! -d {{ project_root_path }} ]; then
+        if [ ! -d {{ project_root_path }}/.git ]; then # Проверяем, существует ли .git, а не вся папка
           sudo -H -u user git clone https://github.com/DelayDelo123/my_flask_project.git {{ project_root_path }} # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
         else
           sudo -H -u user git -C {{ project_root_path }} pull origin master # ИЛИ main
         fi
       args:
         warn: no
-      changed_when: true # Это всегда будет changed=true, так как мы не можем точно отслеживать состояние git через raw
-      # Мы используем sudo -H -u user, чтобы выполнить git от имени user,
-      # но вся задача raw все еще запускается как root через 'become: yes' плейбука.
+      changed_when: true
 
     - name: Изменить владельца директории проекта на www-data (рекурсивно)
       ansible.builtin.file:
@@ -61,6 +68,7 @@
         group: www-data
         recurse: yes
         state: directory
+      # Эта задача выполняется после git pull/clone, чтобы установить права для www-data для UWSGI
 
     - name: Создание директории для временных файлов Ansible (для www-data)
       ansible.builtin.file:
