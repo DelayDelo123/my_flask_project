@@ -21,8 +21,9 @@
         sudo apt-get update
         sudo apt-get install ca-certificates curl gnupg lsb-release -y
         sudo mkdir -p /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg # <--- ИЗМЕНЕНИЕ ЗДЕСЬ
+        # Используем 'ubuntu' вместо 'debian' и 'noble' вместо $(lsb_release -cs)
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null # <--- ИЗМЕНЕНИЕ ЗДЕСЬ
         sudo apt-get update
         sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
       args:
@@ -34,11 +35,6 @@
         name: user
         groups: docker
         append: yes
-      # Примечание: Для того чтобы изменения группы вступили в силу,
-      # текущая SSH-сессия пользователя 'user' должна быть перезапущена.
-      # AWX запускает новую сессию для каждой задачи, так что это часто срабатывает.
-      # Если нет, то может понадобиться перезагрузить ВМ или явно перезапустить службу docker
-      # 'sudo systemctl restart docker' (но это обычно не требуется).
 
     - name: Удаление существующей директории проекта Flask для чистого клонирования (raw)
       raw: sudo rm -rf {{ project_root_path }}
@@ -59,15 +55,12 @@
       changed_when: true
 
     - name: Запуск Docker Compose (сборка и запуск контейнеров)
-      # Эта команда запускается от имени пользователя 'user', который теперь является частью группы 'docker'.
-      # 'chdir' гарантирует, что команда выполняется в корневой директории вашего проекта,
-      # где находятся Dockerfile и docker-compose.yml.
       ansible.builtin.shell: "docker compose up -d --build"
       args:
-        chdir: "{{ project_root_path }}" # Важно! Команда docker compose должна быть выполнена в директории проекта.
+        chdir: "{{ project_root_path }}"
         warn: no
-      become_user: user # Выполнить как пользователь 'user'
-      changed_when: true # Всегда считаем, что изменилось, для простоты отладки
+      become_user: user
+      changed_when: true
 
     - name: Проверка статуса контейнеров (для отладки, не обязательно в продакшене)
       ansible.builtin.shell: "docker ps"
@@ -75,7 +68,7 @@
         warn: no
       become_user: user
       register: docker_ps_output
-      changed_when: false # Эта задача не меняет состояние системы
+      changed_when: false
 
     - name: Вывод статуса контейнеров
       ansible.builtin.debug:
