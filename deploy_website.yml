@@ -11,6 +11,13 @@
         warn: no
       changed_when: false
 
+    - name: Установка модуля python3-six, необходимого для некоторых модулей Ansible
+      ansible.builtin.apt:
+        name: python3-six
+        state: present
+        update_cache: yes
+      # become: yes (уже указано на уровне плейбука)
+
     - name: Обновить системные пакеты (используя shell для обхода проблемы с apt)
       ansible.builtin.shell: |
         sudo apt update
@@ -29,7 +36,7 @@
 
     - name: Клонирование или обновление репозитория Flask-приложения
       ansible.builtin.git:
-        repo: 'https://github.com/DelayDelo123/my_flask_project.git' # <--- НЕ ЗАБУДЬТЕ ЗАМЕНИТЬ НА СВОЙ РЕПОЗИТОРИЙ!
+        repo: 'https://github.com/DelayDelo123/my_flask_project' # <--- НЕ ЗАБУДЬТЕ ЗАМЕНИТЬ НА СВОЙ РЕПОЗИТОРИЙ!
         dest: '/home/user/my_flask_project' # <--- ПУТЬ К ПРОЕКТУ НА SLAVE-ВМ
         version: master # ИЛИ main, как у вас на GitHub
         force: yes
