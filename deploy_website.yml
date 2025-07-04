@@ -5,33 +5,21 @@
   gather_facts: false # Отключаем сбор фактов, чтобы избежать возможных проблем с Python на ранних этапах
 
   vars:
-    ansible_python_interpreter: /usr/bin/python3 # Оставляем стандартный путь
+    ansible_python_interpreter: /usr/bin/python3 # Используем корректный путь
     project_root_path: /home/user/my_flask_project
     app_port: 5000
 
   tasks:
-    - name: Убедиться, что python3-apt, python3-pip, git и основные Python-библиотеки установлены и система обновлена (raw)
-      # Эта raw-задача устанавливает все необходимое через apt.
-      # Убираем все зависимости из отдельной apt-задачи, так как эта raw-команда справится со всем.
+    - name: Убедиться, что python3-apt, python3-pip, git, haveged и основные Python-библиотеки установлены и система обновлена (raw)
+      # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Добавляем haveged ---
       raw: |
         sudo apt update
-        sudo apt install -y python3-apt python3-pip git python3-setuptools python3-wheel python3-six
+        sudo apt install -y python3-apt python3-pip git python3-setuptools python3-wheel python3-six haveged
         sudo apt upgrade -y
         sudo apt autoremove -y
       args:
         warn: no
       changed_when: true
-
-    # --- УДАЛЯЕМ ЭТУ ЗАДАЧУ, ПОТОМУ ЧТО ЕЁ ФУНКЦИОНАЛ ПЕРЕНЕСЁН В ПЕРВУЮ RAW-ЗАДАЧУ ---
-    # - name: Установка необходимых Python-пакетов для Ansible через apt
-    #   ansible.builtin.apt:
-    #     name:
-    #       - python3-setuptools
-    #       - python3-wheel
-    #       - python3-six
-    #     state: present
-    #     update_cache: yes
-    # --- КОНЕЦ УДАЛЯЕМОЙ ЗАДАЧИ ---
 
     - name: Установка Docker (raw)
       raw: |
