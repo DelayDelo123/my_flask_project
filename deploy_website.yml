@@ -2,21 +2,20 @@
 - name: Развертывание Простого Flask-сайта
   hosts: web_servers
   become: yes # Выполняет задачи с повышением привилегий (как root)
-  gather_facts: false # Оставляем отключенным, так как это вызывало проблемы
+  gather_facts: false # Отключаем сбор фактов для ускорения и избежания некоторых проблем
 
   tasks:
     - name: Убедиться, что python3-apt установлен для модулей Ansible (используя raw)
       raw: sudo apt update && sudo apt install -y python3-apt python3-pip
       args:
         warn: no
-      changed_when: false
+      changed_when: false # Эта задача в основном для idempotency, если уже установлено
 
-    - name: Установка модуля python3-six, необходимого для некоторых модулей Ansible
-      ansible.builtin.apt:
-        name: python3-six
-        state: present
-        update_cache: yes
-      # become: yes (уже указано на уровне плейбука)
+    - name: Установка модуля python3-six (обход ModuleNotFoundError)
+      raw: sudo apt install -y python3-six
+      args:
+        warn: no
+      changed_when: true # Может быть true, если пакет устанавливается впервые
 
     - name: Обновить системные пакеты (используя shell для обхода проблемы с apt)
       ansible.builtin.shell: |
@@ -36,9 +35,9 @@
 
     - name: Клонирование или обновление репозитория Flask-приложения
       ansible.builtin.git:
-        repo: 'https://github.com/DelayDelo123/my_flask_project' # <--- НЕ ЗАБУДЬТЕ ЗАМЕНИТЬ НА СВОЙ РЕПОЗИТОРИЙ!
+        repo: 'https://github.com/DelayDelo123/my_flask_project' # <--- ВАЖНО: ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
         dest: '/home/user/my_flask_project' # <--- ПУТЬ К ПРОЕКТУ НА SLAVE-ВМ
-        version: master # ИЛИ main, как у вас на GitHub
+        version: master # ИЛИ 'main', как у вас на GitHub
         force: yes
       become_user: user # Клонируем от имени пользователя 'user'
 
@@ -63,7 +62,7 @@
     - name: Создание виртуального окружения Python
       ansible.builtin.shell: "python3 -m venv /home/user/my_flask_project/venv"
       args:
-        creates: /home/user/my_flask_project/venv/bin/pip
+        creates: /home/user/my_flask_project/venv/bin/pip # Проверяет, существует ли venv
       become_user: www-data # <--- ВАЖНО: теперь создаем venv от www-data
 
     - name: Установка зависимостей Flask из requirements.txt
