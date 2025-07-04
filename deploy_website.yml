@@ -1,12 +1,12 @@
 ---
 - name: Развертывание Flask-сайта с Docker Compose
   hosts: web_servers
-  become: yes # Выполняет задачи с повышением привилегий (как root)
-  gather_facts: false # Отключаем сбор фактов для ускорения
+  become: yes
+  gather_facts: false
 
   vars:
     ansible_python_interpreter: /usr/bin/python3
-    project_root_path: /home/user/my_flask_project # Путь, куда будет клонирован репозиторий
+    project_root_path: /home/user/my_flask_project
     app_port: 5000
 
   tasks:
@@ -21,9 +21,9 @@
         sudo apt-get update
         sudo apt-get install ca-certificates curl gnupg lsb-release -y
         sudo mkdir -p /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg # <--- ИЗМЕНЕНИЕ ЗДЕСЬ
-        # Используем 'ubuntu' вместо 'debian' и 'noble' вместо $(lsb_release -cs)
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null # <--- ИЗМЕНЕНИЕ ЗДЕСЬ
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        # ИЗМЕНЕНИЕ ЗДЕСЬ: Используем 'linux/ubuntu' и явно 'noble'
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
         sudo apt-get update
         sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
       args:
