@@ -16,18 +16,17 @@
         warn: no
       changed_when: true
 
-    # --- НОВЫЕ ЗАДАЧИ ДЛЯ УСТРАНЕНИЯ ModuleNotFoundError ---
-    - name: Установка необходимых Python-пакетов для Ansible через pip
-      ansible.builtin.pip:
+    # --- ИЗМЕНЕННАЯ ЗАДАЧА: Установка необходимых Python-пакетов для Ansible через APT ---
+    - name: Установка необходимых Python-пакетов для Ansible через apt
+      ansible.builtin.apt:
         name:
-          - setuptools
-          - wheel
-          - six
-          - pywinrm # Хотя это для Windows, иногда полезно иметь для полноты
-        executable: pip3 # Убедимся, что используем pip для python3
-      when: ansible_python_interpreter is defined and ansible_python_interpreter == '/usr/bin/python3'
-      # Этот шаг должен быть выполнен после первой raw-команды, которая устанавливает python3-pip
-    # --- КОНЕЦ НОВЫХ ЗАДАЧ ---
+          - python3-setuptools
+          - python3-wheel
+          - python3-six # <--- ИЗМЕНЕНИЕ ЗДЕСЬ: Устанавливаем six через apt!
+        state: present
+        update_cache: yes
+      # Эту задачу можно выполнять всегда, она не будет конфликтовать
+    # --- КОНЕЦ ИЗМЕНЕННОЙ ЗАДАЧИ ---
 
     - name: Установка Docker (raw)
       raw: |
@@ -47,9 +46,6 @@
         name: user
         groups: docker
         append: yes
-      # ВНИМАНИЕ: Если эта задача снова выдаст ошибку, попробуйте перезагрузить ВМ
-      # Это иногда требуется, чтобы изменения групп вступили в силу.
-      # Однако, сначала попробуем без перезагрузки, так как AWX запускает новую сессию.
 
     - name: Удаление существующей директории проекта Flask для чистого клонирования (raw)
       raw: sudo rm -rf {{ project_root_path }}
