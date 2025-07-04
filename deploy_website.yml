@@ -1,8 +1,8 @@
 ---
 - name: Развертывание Простого Flask-сайта
   hosts: web_servers
-  become: yes # Выполняет задачи с повышением привилегий (как root)
-  gather_facts: false # Отключаем сбор фактов для ускорения и избежания некоторых проблем
+  become: yes
+  gather_facts: false
 
   vars:
     ansible_python_interpreter: /usr/bin/python3
@@ -39,13 +39,11 @@
         warn: no
       changed_when: true
 
-    # --- ВСЕ НИЖЕ СДЕЛАНО ЧЕРЕЗ RAW/SHELL ДЛЯ ОБХОДА SIX.MOVES ---
-
     - name: Удаление существующей директории проекта Flask для чистого клонирования (raw)
       raw: sudo rm -rf {{ project_root_path }}
       args:
         warn: no
-      changed_when: true # Всегда считаем, что что-то изменилось
+      changed_when: true
 
     - name: Создание директории проекта с владельцем 'user' для клонирования (raw)
       raw: sudo mkdir -p {{ project_root_path }} && sudo chown user:user {{ project_root_path }} && sudo chmod 0755 {{ project_root_path }}
@@ -60,13 +58,13 @@
       changed_when: true
 
     - name: Изменить владельца директории проекта на www-data (рекурсивно, после клонирования) (raw)
-      raw: sudo chown -R www-data:www-data {{ project_root_path }}
+      raw: sudo chown -R www-data:www-data {{ project_root_path }} && sudo chmod -R 0775 {{ project_root_path }} # <--- ИЗМЕНЕНИЕ ЗДЕСЬ!
       args:
         warn: no
       changed_when: true
 
     - name: Создание директории для временных файлов Ansible (для www-data) (raw)
-      raw: sudo mkdir -p {{ project_root_path }}/ansible_tmp && sudo chown www-data:www-data {{ project_root_path }}/ansible_tmp && sudo chmod 0755 {{ project_root_path }}/ansible_tmp
+      raw: sudo mkdir -p {{ project_root_path }}/ansible_tmp && sudo chown www-data:www-data {{ project_root_path }}/ansible_tmp && sudo chmod 0775 {{ project_root_path }}/ansible_tmp # <--- ИЗМЕНЕНИЕ ЗДЕСЬ!
       args:
         warn: no
       changed_when: true
@@ -76,7 +74,6 @@
       args:
         warn: no
       changed_when: true
-      # Проверка creates не будет работать с raw, но мы удаляем и создаем каждый раз для надежности.
 
     - name: Установка зависимостей Flask из requirements.txt (raw)
       raw: sudo -H -u www-data {{ project_root_path }}/venv/bin/pip install -r {{ project_root_path }}/requirements.txt
@@ -84,7 +81,6 @@
         warn: no
       changed_when: true
 
-    # --- Здесь мы возвращаемся к обычным модулям, так как Python-окружение для app готово ---
     - name: Копирование файла конфигурации UWSGI
       ansible.builtin.template:
         src: uwsgi.ini
