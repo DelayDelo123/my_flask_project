@@ -5,14 +5,15 @@
   gather_facts: false
 
   vars:
-    ansible_python_interpreter: /usr/bin/python3
+    # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Меняем интерпретатор на auto_legacy_discovery ---
+    ansible_python_interpreter: auto_legacy_discovery
     project_root_path: /home/user/my_flask_project
     app_port: 5000
 
   tasks:
-    - name: Убедиться, что python3-apt и python3-distutils установлены, а система обновлена (raw)
-      # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Добавляем python3-distutils ---
-      raw: sudo apt update && sudo apt install -y python3-apt python3-pip python3-distutils git -y && sudo apt upgrade -y && sudo apt autoremove -y
+    - name: Убедиться, что python3-apt установлен, а система обновлена (raw)
+      # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Убираем python3-distutils ---
+      raw: sudo apt update && sudo apt install -y python3-apt python3-pip git -y && sudo apt upgrade -y && sudo apt autoremove -y
       args:
         warn: no
       changed_when: true
@@ -22,7 +23,7 @@
         name:
           - python3-setuptools
           - python3-wheel
-          - python3-six # Теперь этот пакет сможет установиться
+          - python3-six
         state: present
         update_cache: yes
 
