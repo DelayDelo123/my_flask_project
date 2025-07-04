@@ -4,9 +4,9 @@
   become: yes # Выполняет задачи с повышением привилегий (как root)
   gather_facts: false # Отключаем сбор фактов для ускорения и избежания некоторых проблем
 
-  vars: # <--- Явно указываем интерпретатор Python
+  vars:
     ansible_python_interpreter: /usr/bin/python3
-    project_root_path: /home/user/my_flask_project # Объявляем переменную для пути проекта
+    project_root_path: /home/user/my_flask_project
 
   tasks:
     - name: Убедиться, что python3-apt установлен для модулей Ansible (используя raw)
@@ -39,36 +39,38 @@
         warn: no
       changed_when: true
 
-    # --- НОВАЯ ЗАДАЧА ДЛЯ ПРАВ .GIT ---
-    - name: Изменение владельца директории .git на 'user' перед Git-операциями
+    # --- КЛЮЧЕВЫЕ ИЗМЕНЕНИЯ ЗДЕСЬ: Чистим и клонируем/перенастраиваем права ---
+
+    - name: Удаление существующей директории проекта Flask для чистого клонирования
       ansible.builtin.file:
-        path: "{{ project_root_path }}/.git"
+        path: "{{ project_root_path }}"
+        state: absent
+      # Это гарантирует, что мы начинаем с нуля, устраняя любые предыдущие проблемы с правами.
+
+    - name: Создание директории проекта с владельцем 'user' для клонирования
+      ansible.builtin.file:
+        path: "{{ project_root_path }}"
         owner: user
         group: user
-        recurse: yes
+        mode: '0755'
         state: directory
-      when: "'/home/user/my_flask_project/.git' is exists" # Выполнять только если .git уже существует (для pull)
-      # Эта задача должна быть выполнена перед клонированием/обновлением, чтобы у пользователя 'user' были права
+      # Создаем директорию с правами пользователя 'user', чтобы он мог в неё клонировать.
 
-    - name: Клонирование или обновление репозитория Flask-приложения (используя raw)
-      raw: |
-        if [ ! -d {{ project_root_path }}/.git ]; then # Проверяем, существует ли .git, а не вся папка
-          sudo -H -u user git clone https://github.com/DelayDelo123/my_flask_project.git {{ project_root_path }} # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
-        else
-          sudo -H -u user git -C {{ project_root_path }} pull origin master # ИЛИ main
-        fi
+    - name: Клонирование репозитория Flask-приложения (используя raw)
+      raw: sudo -H -u user git clone https://github.com/DelayDelo123/my_flask_project.git {{ project_root_path }} # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
       args:
         warn: no
       changed_when: true
+      # Теперь Git-клон должен пройти без проблем, так как директория создана с правильными правами.
 
-    - name: Изменить владельца директории проекта на www-data (рекурсивно)
+    - name: Изменить владельца директории проекта на www-data (рекурсивно, после клонирования)
       ansible.builtin.file:
         path: "{{ project_root_path }}"
         owner: www-data
         group: www-data
         recurse: yes
         state: directory
-      # Эта задача выполняется после git pull/clone, чтобы установить права для www-data для UWSGI
+      # После клонирования мы меняем владельца всего проекта на www-data для UWSGI.
 
     - name: Создание директории для временных файлов Ansible (для www-data)
       ansible.builtin.file:
