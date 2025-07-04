@@ -10,23 +10,21 @@
     app_port: 5000
 
   tasks:
-    - name: Убедиться, что python3-apt установлен и система обновлена (raw)
-      raw: sudo apt update && sudo apt install -y python3-apt python3-pip git -y && sudo apt upgrade -y && sudo apt autoremove -y
+    - name: Убедиться, что python3-apt и python3-distutils установлены, а система обновлена (raw)
+      # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Добавляем python3-distutils ---
+      raw: sudo apt update && sudo apt install -y python3-apt python3-pip python3-distutils git -y && sudo apt upgrade -y && sudo apt autoremove -y
       args:
         warn: no
       changed_when: true
 
-    # --- ИЗМЕНЕННАЯ ЗАДАЧА: Установка необходимых Python-пакетов для Ansible через APT ---
     - name: Установка необходимых Python-пакетов для Ansible через apt
       ansible.builtin.apt:
         name:
           - python3-setuptools
           - python3-wheel
-          - python3-six # <--- ИЗМЕНЕНИЕ ЗДЕСЬ: Устанавливаем six через apt!
+          - python3-six # Теперь этот пакет сможет установиться
         state: present
         update_cache: yes
-      # Эту задачу можно выполнять всегда, она не будет конфликтовать
-    # --- КОНЕЦ ИЗМЕНЕННОЙ ЗАДАЧИ ---
 
     - name: Установка Docker (raw)
       raw: |
