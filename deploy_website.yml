@@ -1,8 +1,8 @@
 ---
 - name: Развертывание Простого Flask-сайта
   hosts: web_servers
-  become: yes
-  gather_facts: false
+  become: yes # Выполняет задачи с повышением привилегий (как root)
+  gather_facts: false # Отключаем сбор фактов для ускорения и избежания некоторых проблем
 
   vars:
     ansible_python_interpreter: /usr/bin/python3
@@ -39,11 +39,13 @@
         warn: no
       changed_when: true
 
-    - name: Удаление существующей директории проекта Flask для чистого клонирования (raw)
-      raw: sudo rm -rf {{ project_root_path }}
-      args:
-        warn: no
-      changed_when: true
+    # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Возвращаемся к ansible.builtin.file для удаления ---
+    - name: Удаление существующей директории проекта Flask для чистого клонирования
+      ansible.builtin.file:
+        path: "{{ project_root_path }}"
+        state: absent
+      # Ansible выполнит это с become: yes, то есть как root,
+      # что гарантированно удалит директорию, независимо от владельца.
 
     - name: Создание директории проекта с владельцем 'user' для клонирования (raw)
       raw: sudo mkdir -p {{ project_root_path }} && sudo chown user:user {{ project_root_path }} && sudo chmod 0755 {{ project_root_path }}
@@ -58,13 +60,13 @@
       changed_when: true
 
     - name: Изменить владельца директории проекта на www-data (рекурсивно, после клонирования) (raw)
-      raw: sudo chown -R www-data:www-data {{ project_root_path }} && sudo chmod -R 0775 {{ project_root_path }} # <--- ИЗМЕНЕНИЕ ЗДЕСЬ!
+      raw: sudo chown -R www-data:www-data {{ project_root_path }} && sudo chmod -R 0775 {{ project_root_path }}
       args:
         warn: no
       changed_when: true
 
     - name: Создание директории для временных файлов Ansible (для www-data) (raw)
-      raw: sudo mkdir -p {{ project_root_path }}/ansible_tmp && sudo chown www-data:www-data {{ project_root_path }}/ansible_tmp && sudo chmod 0775 {{ project_root_path }}/ansible_tmp # <--- ИЗМЕНЕНИЕ ЗДЕСЬ!
+      raw: sudo mkdir -p {{ project_root_path }}/ansible_tmp && sudo chown www-data:www-data {{ project_root_path }}/ansible_tmp && sudo chmod 0775 {{ project_root_path }}/ansible_tmp
       args:
         warn: no
       changed_when: true
