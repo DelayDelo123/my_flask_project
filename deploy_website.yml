@@ -33,7 +33,15 @@
         warn: no
       changed_when: true
 
-    - name: Клонирование или обновление репозитория Flask-приложения (используя raw) # <--- ИЗМЕНЕНО!
+    # --- НОВАЯ ЗАДАЧА ДЛЯ SAFE.DIRECTORY ---
+    - name: Добавление директории проекта в safe.directory Git для пользователя 'user'
+      raw: sudo -H -u user git config --global --add safe.directory {{ project_root_path }}
+      args:
+        warn: no
+      changed_when: true
+      # Это позволяет пользователю 'user' работать с репозиторием, владельцем которого является 'www-data'
+
+    - name: Клонирование или обновление репозитория Flask-приложения (используя raw)
       raw: |
         if [ ! -d {{ project_root_path }} ]; then
           sudo -H -u user git clone https://github.com/DelayDelo123/my_flask_project.git {{ project_root_path }} # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
