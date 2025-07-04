@@ -28,8 +28,7 @@
           - python3-six
         state: present
         update_cache: yes
-      # Вот здесь должна быть строка 'timeout'
-      timeout: 300 # Перемещено на уровень задачи
+      timeout: 300 # <-- Вот здесь исправленный отступ
     
     - name: Установка Docker (raw)
       raw: |
