@@ -2,39 +2,46 @@
 - name: Развертывание Flask-сайта с Docker Compose
   hosts: web_servers
   become: yes
-  gather_facts: false
+  gather_facts: false # Отключаем сбор фактов, чтобы избежать возможных проблем с Python на ранних этапах
 
   vars:
-    # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Возвращаем правильный путь к интерпретатору Python ---
-    ansible_python_interpreter: /usr/bin/python3
+    ansible_python_interpreter: /usr/bin/python3 # Оставляем стандартный путь
     project_root_path: /home/user/my_flask_project
     app_port: 5000
 
   tasks:
-    - name: Убедиться, что python3-apt установлен, а система обновлена (raw)
-      raw: sudo apt update && sudo apt install -y python3-apt python3-pip git -y && sudo apt upgrade -y && sudo apt autoremove -y
+    - name: Убедиться, что python3-apt, python3-pip, git и основные Python-библиотеки установлены и система обновлена (raw)
+      # Эта raw-задача устанавливает все необходимое через apt.
+      # Убираем все зависимости из отдельной apt-задачи, так как эта raw-команда справится со всем.
+      raw: |
+        sudo apt update
+        sudo apt install -y python3-apt python3-pip git python3-setuptools python3-wheel python3-six
+        sudo apt upgrade -y
+        sudo apt autoremove -y
       args:
         warn: no
       changed_when: true
 
-    - name: Установка необходимых Python-пакетов для Ansible через apt
-      ansible.builtin.apt:
-        name:
-          - python3-setuptools
-          - python3-wheel
-          - python3-six
-        state: present
-        update_cache: yes
+    # --- УДАЛЯЕМ ЭТУ ЗАДАЧУ, ПОТОМУ ЧТО ЕЁ ФУНКЦИОНАЛ ПЕРЕНЕСЁН В ПЕРВУЮ RAW-ЗАДАЧУ ---
+    # - name: Установка необходимых Python-пакетов для Ansible через apt
+    #   ansible.builtin.apt:
+    #     name:
+    #       - python3-setuptools
+    #       - python3-wheel
+    #       - python3-six
+    #     state: present
+    #     update_cache: yes
+    # --- КОНЕЦ УДАЛЯЕМОЙ ЗАДАЧИ ---
 
     - name: Установка Docker (raw)
       raw: |
         sudo apt-get update
-        sudo apt-get install ca-certificates curl gnupg lsb-release -y
+        sudo apt-get install -y ca-certificates curl gnupg lsb-release
         sudo mkdir -p /etc/apt/keyrings
         curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
         sudo apt-get update
-        sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+        sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
       args:
         warn: no
       changed_when: true
