@@ -39,59 +39,52 @@
         warn: no
       changed_when: true
 
-    # --- КЛЮЧЕВЫЕ ИЗМЕНЕНИЯ ЗДЕСЬ: Чистим и клонируем/перенастраиваем права ---
+    # --- ВСЕ НИЖЕ СДЕЛАНО ЧЕРЕЗ RAW/SHELL ДЛЯ ОБХОДА SIX.MOVES ---
 
-    - name: Удаление существующей директории проекта Flask для чистого клонирования
-      ansible.builtin.file:
-        path: "{{ project_root_path }}"
-        state: absent
-      # Это гарантирует, что мы начинаем с нуля, устраняя любые предыдущие проблемы с правами.
+    - name: Удаление существующей директории проекта Flask для чистого клонирования (raw)
+      raw: sudo rm -rf {{ project_root_path }}
+      args:
+        warn: no
+      changed_when: true # Всегда считаем, что что-то изменилось
 
-    - name: Создание директории проекта с владельцем 'user' для клонирования
-      ansible.builtin.file:
-        path: "{{ project_root_path }}"
-        owner: user
-        group: user
-        mode: '0755'
-        state: directory
-      # Создаем директорию с правами пользователя 'user', чтобы он мог в неё клонировать.
+    - name: Создание директории проекта с владельцем 'user' для клонирования (raw)
+      raw: sudo mkdir -p {{ project_root_path }} && sudo chown user:user {{ project_root_path }} && sudo chmod 0755 {{ project_root_path }}
+      args:
+        warn: no
+      changed_when: true
 
     - name: Клонирование репозитория Flask-приложения (используя raw)
       raw: sudo -H -u user git clone https://github.com/DelayDelo123/my_flask_project.git {{ project_root_path }} # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
       args:
         warn: no
       changed_when: true
-      # Теперь Git-клон должен пройти без проблем, так как директория создана с правильными правами.
 
-    - name: Изменить владельца директории проекта на www-data (рекурсивно, после клонирования)
-      ansible.builtin.file:
-        path: "{{ project_root_path }}"
-        owner: www-data
-        group: www-data
-        recurse: yes
-        state: directory
-      # После клонирования мы меняем владельца всего проекта на www-data для UWSGI.
-
-    - name: Создание директории для временных файлов Ansible (для www-data)
-      ansible.builtin.file:
-        path: "{{ project_root_path }}/ansible_tmp"
-        state: directory
-        owner: www-data
-        group: www-data
-        mode: '0755'
-
-    - name: Создание виртуального окружения Python
-      ansible.builtin.shell: "python3 -m venv {{ project_root_path }}/venv"
+    - name: Изменить владельца директории проекта на www-data (рекурсивно, после клонирования) (raw)
+      raw: sudo chown -R www-data:www-data {{ project_root_path }}
       args:
-        creates: "{{ project_root_path }}/venv/bin/pip"
-      become_user: www-data
+        warn: no
+      changed_when: true
 
-    - name: Установка зависимостей Flask из requirements.txt
-      ansible.builtin.pip:
-        requirements: "{{ project_root_path }}/requirements.txt"
-        virtualenv: "{{ project_root_path }}/venv"
-      become_user: www-data
+    - name: Создание директории для временных файлов Ansible (для www-data) (raw)
+      raw: sudo mkdir -p {{ project_root_path }}/ansible_tmp && sudo chown www-data:www-data {{ project_root_path }}/ansible_tmp && sudo chmod 0755 {{ project_root_path }}/ansible_tmp
+      args:
+        warn: no
+      changed_when: true
 
+    - name: Создание виртуального окружения Python (raw)
+      raw: sudo -H -u www-data python3 -m venv {{ project_root_path }}/venv
+      args:
+        warn: no
+      changed_when: true
+      # Проверка creates не будет работать с raw, но мы удаляем и создаем каждый раз для надежности.
+
+    - name: Установка зависимостей Flask из requirements.txt (raw)
+      raw: sudo -H -u www-data {{ project_root_path }}/venv/bin/pip install -r {{ project_root_path }}/requirements.txt
+      args:
+        warn: no
+      changed_when: true
+
+    # --- Здесь мы возвращаемся к обычным модулям, так как Python-окружение для app готово ---
     - name: Копирование файла конфигурации UWSGI
       ansible.builtin.template:
         src: uwsgi.ini
