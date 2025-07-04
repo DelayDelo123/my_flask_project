@@ -39,13 +39,12 @@
         warn: no
       changed_when: true
 
-    # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Возвращаемся к ansible.builtin.file для удаления ---
-    - name: Удаление существующей директории проекта Flask для чистого клонирования
-      ansible.builtin.file:
-        path: "{{ project_root_path }}"
-        state: absent
-      # Ansible выполнит это с become: yes, то есть как root,
-      # что гарантированно удалит директорию, независимо от владельца.
+    # --- ВОЗВРАЩАЕМСЯ К RAW ДЛЯ УДАЛЕНИЯ ДИРЕКТОРИИ ---
+    - name: Удаление существующей директории проекта Flask для чистого клонирования (raw)
+      raw: sudo rm -rf {{ project_root_path }}
+      args:
+        warn: no
+      changed_when: true # Всегда считаем, что что-то изменилось
 
     - name: Создание директории проекта с владельцем 'user' для клонирования (raw)
       raw: sudo mkdir -p {{ project_root_path }} && sudo chown user:user {{ project_root_path }} && sudo chmod 0755 {{ project_root_path }}
@@ -83,6 +82,9 @@
         warn: no
       changed_when: true
 
+    # --- Здесь мы возвращаемся к обычным модулям, так как Python-окружение для app готово ---
+    # Модули template и systemd должны работать, так как они в основном оперируют на локальной машине Ansible
+    # или используют базовые системные вызовы на удаленной.
     - name: Копирование файла конфигурации UWSGI
       ansible.builtin.template:
         src: uwsgi.ini
@@ -99,14 +101,14 @@
       notify: Перезагрузить Nginx
 
     - name: Создание символической ссылки на конфигурацию Nginx
-      ansible.builtin.file:
+      ansible.builtin.file: # Возвращаемся к file, так как это не начальная операция
         src: /etc/nginx/sites-available/flask_app
         dest: /etc/nginx/sites-enabled/flask_app
         state: link
       notify: Перезагрузить Nginx
 
     - name: Удаление ссылки на дефолтную конфигурацию Nginx
-      ansible.builtin.file:
+      ansible.builtin.file: # Возвращаемся к file
         path: /etc/nginx/sites-enabled/default
         state: absent
       notify: Перезагрузить Nginx
