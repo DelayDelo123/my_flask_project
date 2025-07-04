@@ -4,21 +4,22 @@
   become: yes # Выполняет задачи с повышением привилегий (как root)
   gather_facts: false # Отключаем сбор фактов для ускорения и избежания некоторых проблем
 
-  vars: # <--- НОВЫЙ БЛОК: Явно указываем интерпретатор Python
+  vars: # <--- Явно указываем интерпретатор Python
     ansible_python_interpreter: /usr/bin/python3
+    project_root_path: /home/user/my_flask_project # Объявляем переменную для пути проекта
 
   tasks:
     - name: Убедиться, что python3-apt установлен для модулей Ansible (используя raw)
       raw: sudo apt update && sudo apt install -y python3-apt python3-pip
       args:
         warn: no
-      changed_when: false # Эта задача в основном для idempotency, если уже установлено
+      changed_when: false
 
     - name: Установка модуля python3-six (обход ModuleNotFoundError)
       raw: sudo apt install -y python3-six
       args:
         warn: no
-      changed_when: true # Может быть true, если пакет устанавливается впервые
+      changed_when: true
 
     - name: Обновить системные пакеты (используя raw для обхода проблемы с python3-six)
       raw: sudo apt update && sudo apt upgrade -y && sudo apt autoremove -y
@@ -32,50 +33,53 @@
         warn: no
       changed_when: true
 
-    - name: Клонирование или обновление репозитория Flask-приложения
-      ansible.builtin.git:
-        repo: 'https://github.com/DelayDelo123/my_flask_project' # <--- ВАЖНО: ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
-        dest: '/home/user/my_flask_project' # <--- ПУТЬ К ПРОЕКТУ НА SLAVE-ВМ
-        version: master # ИЛИ 'main', как у вас на GitHub
-        force: yes
-      become_user: user # Клонируем от имени пользователя 'user'
+    - name: Клонирование или обновление репозитория Flask-приложения (используя raw) # <--- ИЗМЕНЕНО!
+      raw: |
+        if [ ! -d {{ project_root_path }} ]; then
+          sudo -H -u user git clone https://github.com/DelayDelo123/my_flask_project.git {{ project_root_path }} # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
+        else
+          sudo -H -u user git -C {{ project_root_path }} pull origin master # ИЛИ main
+        fi
+      args:
+        warn: no
+      changed_when: true # Это всегда будет changed=true, так как мы не можем точно отслеживать состояние git через raw
+      # Мы используем sudo -H -u user, чтобы выполнить git от имени user,
+      # но вся задача raw все еще запускается как root через 'become: yes' плейбука.
 
     - name: Изменить владельца директории проекта на www-data (рекурсивно)
       ansible.builtin.file:
-        path: /home/user/my_flask_project
+        path: "{{ project_root_path }}"
         owner: www-data
         group: www-data
         recurse: yes
         state: directory
-      # Эта задача выполняется как root (become: yes для плейбука), чтобы изменить владельца на www-data
 
     - name: Создание директории для временных файлов Ansible (для www-data)
       ansible.builtin.file:
-        path: /home/user/my_flask_project/ansible_tmp
+        path: "{{ project_root_path }}/ansible_tmp"
         state: directory
         owner: www-data
         group: www-data
         mode: '0755'
-      # Убедитесь, что ansible_tmp_path в переменных хоста AWX указывает на /home/user/my_flask_project/ansible_tmp
 
     - name: Создание виртуального окружения Python
-      ansible.builtin.shell: "python3 -m venv /home/user/my_flask_project/venv"
+      ansible.builtin.shell: "python3 -m venv {{ project_root_path }}/venv"
       args:
-        creates: /home/user/my_flask_project/venv/bin/pip # Проверяет, существует ли venv
-      become_user: www-data # <--- ВАЖНО: теперь создаем venv от www-data
+        creates: "{{ project_root_path }}/venv/bin/pip"
+      become_user: www-data
 
     - name: Установка зависимостей Flask из requirements.txt
       ansible.builtin.pip:
-        requirements: "/home/user/my_flask_project/requirements.txt"
-        virtualenv: "/home/user/my_flask_project/venv"
-      become_user: www-data # <--- ВАЖНО: теперь устанавливаем зависимости от www-data
+        requirements: "{{ project_root_path }}/requirements.txt"
+        virtualenv: "{{ project_root_path }}/venv"
+      become_user: www-data
 
     - name: Копирование файла конфигурации UWSGI
       ansible.builtin.template:
         src: uwsgi.ini
         dest: "{{ project_root_path }}/uwsgi.ini"
         mode: '0644'
-      become_user: www-data # <--- Копируем от www-data
+      become_user: www-data
       notify: Перезапустить UWSGI сервис
 
     - name: Копирование файла конфигурации Nginx
