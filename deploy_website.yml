@@ -2,19 +2,15 @@
 - name: Развертывание Flask-сайта с Docker Compose
   hosts: web_servers
   become: yes
-  gather_facts: false # Отключаем сбор фактов для более быстрого старта
+  gather_facts: false
 
   vars:
-    # Явно указываем интерпретатор, который гарантированно существует
     ansible_python_interpreter: /usr/bin/python3
     project_root_path: /home/user/my_flask_project
     app_port: 5000
 
   tasks:
     - name: Убедиться, что python3-apt, python3-pip, git и haveged установлены, а система обновлена (raw)
-      # Эта raw-задача устанавливает только базовые необходимые пакеты.
-      # Важно: python3-apt нужен для работы Ansible-модуля 'apt'.
-      # haveged нужен для GPG-операций.
       raw: |
         sudo apt update
         sudo apt install -y python3-apt python3-pip git haveged
@@ -25,9 +21,6 @@
       changed_when: true
 
     - name: Установка необходимых Python-пакетов для Ansible через apt
-      # Теперь, когда python3-apt установлен, используем Ansible-модуль 'apt'
-      # для установки остальных Python-зависимостей Ansible.
-      # Это позволяет Ansible корректно управлять этими пакетами.
       ansible.builtin.apt:
         name:
           - python3-setuptools
@@ -35,11 +28,10 @@
           - python3-six
         state: present
         update_cache: yes
-      # Добавим небольшой таймаут, если модуль apt долго думает
-      timeout: 300 # 5 минут
-
+      # Вот здесь должна быть строка 'timeout'
+      timeout: 300 # Перемещено на уровень задачи
+    
     - name: Установка Docker (raw)
-      # Эта задача устанавливает Docker, Docker Compose Plugin и связанные утилиты.
       raw: |
         sudo apt-get update
         sudo apt-get install -y ca-certificates curl gnupg lsb-release
@@ -71,7 +63,7 @@
       changed_when: true
 
     - name: Клонирование репозитория Flask-приложения (используя raw)
-      raw: sudo -H -u user git clone https://github.com/DelayDelo123/my_flask_project.git {{ project_root_path }} # <--- ЗАМЕНИТЕ НА СВОЙ РЕПОЗИТОРИЙ!
+      raw: sudo -H -u user git clone https://github.com/DelayDelo123/my_flask_project.git {{ project_root_path }}
       args:
         warn: no
       changed_when: true
