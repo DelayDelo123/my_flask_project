@@ -5,14 +5,13 @@
   gather_facts: false
 
   vars:
-    # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Меняем интерпретатор на auto_legacy_discovery ---
-    ansible_python_interpreter: auto_legacy_discovery
+    # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Возвращаем правильный путь к интерпретатору Python ---
+    ansible_python_interpreter: /usr/bin/python3
     project_root_path: /home/user/my_flask_project
     app_port: 5000
 
   tasks:
     - name: Убедиться, что python3-apt установлен, а система обновлена (raw)
-      # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Убираем python3-distutils ---
       raw: sudo apt update && sudo apt install -y python3-apt python3-pip git -y && sudo apt upgrade -y && sudo apt autoremove -y
       args:
         warn: no
