@@ -1,3 +1,1 @@
-Flask
-uWSGI
-# Добавьте здесь другие зависимости вашего проекта
+Flask==2.3.3 # Or your preferred Flask version

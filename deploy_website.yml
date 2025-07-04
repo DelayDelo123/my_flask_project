@@ -1,50 +1,50 @@
 ---
-- name: Развертывание Простого Flask-сайта
+- name: Развертывание Flask-сайта с Docker Compose
   hosts: web_servers
   become: yes # Выполняет задачи с повышением привилегий (как root)
-  gather_facts: false # Отключаем сбор фактов для ускорения и избежания некоторых проблем
+  gather_facts: false # Отключаем сбор фактов для ускорения
 
   vars:
     ansible_python_interpreter: /usr/bin/python3
-    project_root_path: /home/user/my_flask_project
+    project_root_path: /home/user/my_flask_project # Путь, куда будет клонирован репозиторий
+    app_port: 5000
 
   tasks:
-    - name: Убедиться, что python3-apt установлен для модулей Ansible (используя raw)
-      raw: sudo apt update && sudo apt install -y python3-apt python3-pip
-      args:
-        warn: no
-      changed_when: false
-
-    - name: Установка модуля python3-six (обход ModuleNotFoundError)
-      raw: sudo apt install -y python3-six
+    - name: Убедиться, что python3-apt установлен и система обновлена (raw)
+      raw: sudo apt update && sudo apt install -y python3-apt python3-pip git -y && sudo apt upgrade -y && sudo apt autoremove -y
       args:
         warn: no
       changed_when: true
 
-    - name: Обновить системные пакеты (используя raw для обхода проблемы с python3-six)
-      raw: sudo apt update && sudo apt upgrade -y && sudo apt autoremove -y
+    - name: Установка Docker (raw)
+      raw: |
+        sudo apt-get update
+        sudo apt-get install ca-certificates curl gnupg lsb-release -y
+        sudo mkdir -p /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt-get update
+        sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
       args:
         warn: no
       changed_when: true
 
-    - name: Установка зависимостей Python и других пакетов (используя raw)
-      raw: sudo apt install -y git nginx uwsgi uwsgi-plugin-python3 python3-venv
-      args:
-        warn: no
-      changed_when: true
+    - name: Добавление пользователя 'user' в группу docker
+      ansible.builtin.user:
+        name: user
+        groups: docker
+        append: yes
+      # Примечание: Для того чтобы изменения группы вступили в силу,
+      # текущая SSH-сессия пользователя 'user' должна быть перезапущена.
+      # AWX запускает новую сессию для каждой задачи, так что это часто срабатывает.
+      # Если нет, то может понадобиться перезагрузить ВМ или явно перезапустить службу docker
+      # 'sudo systemctl restart docker' (но это обычно не требуется).
 
-    - name: Добавление директории проекта в safe.directory Git для пользователя 'user'
-      raw: sudo -H -u user git config --global --add safe.directory {{ project_root_path }}
-      args:
-        warn: no
-      changed_when: true
-
-    # --- ВОЗВРАЩАЕМСЯ К RAW ДЛЯ УДАЛЕНИЯ ДИРЕКТОРИИ ---
     - name: Удаление существующей директории проекта Flask для чистого клонирования (raw)
       raw: sudo rm -rf {{ project_root_path }}
       args:
         warn: no
-      changed_when: true # Всегда считаем, что что-то изменилось
+      changed_when: true
 
     - name: Создание директории проекта с владельцем 'user' для клонирования (raw)
       raw: sudo mkdir -p {{ project_root_path }} && sudo chown user:user {{ project_root_path }} && sudo chmod 0755 {{ project_root_path }}
@@ -58,83 +58,25 @@
         warn: no
       changed_when: true
 
-    - name: Изменить владельца директории проекта на www-data (рекурсивно, после клонирования) (raw)
-      raw: sudo chown -R www-data:www-data {{ project_root_path }} && sudo chmod -R 0775 {{ project_root_path }}
+    - name: Запуск Docker Compose (сборка и запуск контейнеров)
+      # Эта команда запускается от имени пользователя 'user', который теперь является частью группы 'docker'.
+      # 'chdir' гарантирует, что команда выполняется в корневой директории вашего проекта,
+      # где находятся Dockerfile и docker-compose.yml.
+      ansible.builtin.shell: "docker compose up -d --build"
+      args:
+        chdir: "{{ project_root_path }}" # Важно! Команда docker compose должна быть выполнена в директории проекта.
+        warn: no
+      become_user: user # Выполнить как пользователь 'user'
+      changed_when: true # Всегда считаем, что изменилось, для простоты отладки
+
+    - name: Проверка статуса контейнеров (для отладки, не обязательно в продакшене)
+      ansible.builtin.shell: "docker ps"
       args:
         warn: no
-      changed_when: true
+      become_user: user
+      register: docker_ps_output
+      changed_when: false # Эта задача не меняет состояние системы
 
-    - name: Создание директории для временных файлов Ansible (для www-data) (raw)
-      raw: sudo mkdir -p {{ project_root_path }}/ansible_tmp && sudo chown www-data:www-data {{ project_root_path }}/ansible_tmp && sudo chmod 0775 {{ project_root_path }}/ansible_tmp
-      args:
-        warn: no
-      changed_when: true
-
-    - name: Создание виртуального окружения Python (raw)
-      raw: sudo -H -u www-data python3 -m venv {{ project_root_path }}/venv
-      args:
-        warn: no
-      changed_when: true
-
-    - name: Установка зависимостей Flask из requirements.txt (raw)
-      raw: sudo -H -u www-data {{ project_root_path }}/venv/bin/pip install -r {{ project_root_path }}/requirements.txt
-      args:
-        warn: no
-      changed_when: true
-
-    # --- Здесь мы возвращаемся к обычным модулям, так как Python-окружение для app готово ---
-    # Модули template и systemd должны работать, так как они в основном оперируют на локальной машине Ansible
-    # или используют базовые системные вызовы на удаленной.
-    - name: Копирование файла конфигурации UWSGI
-      ansible.builtin.template:
-        src: uwsgi.ini
-        dest: "{{ project_root_path }}/uwsgi.ini"
-        mode: '0644'
-      become_user: www-data
-      notify: Перезапустить UWSGI сервис
-
-    - name: Копирование файла конфигурации Nginx
-      ansible.builtin.template:
-        src: nginx_site.conf.j2
-        dest: /etc/nginx/sites-available/flask_app
-        mode: '0644'
-      notify: Перезагрузить Nginx
-
-    - name: Создание символической ссылки на конфигурацию Nginx
-      ansible.builtin.file: # Возвращаемся к file, так как это не начальная операция
-        src: /etc/nginx/sites-available/flask_app
-        dest: /etc/nginx/sites-enabled/flask_app
-        state: link
-      notify: Перезагрузить Nginx
-
-    - name: Удаление ссылки на дефолтную конфигурацию Nginx
-      ansible.builtin.file: # Возвращаемся к file
-        path: /etc/nginx/sites-enabled/default
-        state: absent
-      notify: Перезагрузить Nginx
-
-    - name: Копирование файла systemd-сервиса UWSGI
-      ansible.builtin.template:
-        src: flask_app.service.j2
-        dest: /etc/systemd/system/flask_app.service
-        mode: '0644'
-      notify: Перезапустить UWSGI сервис
-
-    - name: Включение и запуск systemd-сервиса UWSGI
-      ansible.builtin.systemd:
-        name: flask_app
-        state: started
-        enabled: yes
-        daemon_reload: yes
-
-  handlers:
-    - name: Перезагрузить Nginx
-      ansible.builtin.systemd:
-        name: nginx
-        state: restarted
-
-    - name: Перезапустить UWSGI сервис
-      ansible.builtin.systemd:
-        name: flask_app
-        state: restarted
-        daemon_reload: yes
+    - name: Вывод статуса контейнеров
+      ansible.builtin.debug:
+        var: docker_ps_output.stdout_lines
